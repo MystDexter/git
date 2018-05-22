@@ -2463,7 +2463,7 @@ class P4Sync(Command, P4UserMap):
         """
         ret = p4Cmd(["diff2", "{0}#{1}".format(path, filerev), "{0}@{1}".format(path, revision)])
         if verbose:
-            print("p4 diff2 %s %s %s => %s" % (path, filerev, revision, ret))
+            print("p4 diff2 path %s filerev %s revision %s => %s" % (path, filerev, revision, ret))
         return ret["status"] == "identical"
 
     def extractFilesFromCommit(self, commit, shelved=False, shelved_cl = 0, origin_revision = 0):
@@ -2492,7 +2492,12 @@ class P4Sync(Command, P4UserMap):
             if shelved:
                 file["shelved_cl"] = int(shelved_cl)
 
-                if file["rev"] != "none" and \
+                # For shelved changelists, check that the revision of each file that the
+                # shelve was based on matches the revision that we are using for the
+                # starting point for git-fast-import (self.initialParent). Otherwise
+                # the resulting diff will contain deltas from multiple commits.
+
+                if file["action"] != "add" and \
                     not self.cmp_shelved(path, file["rev"], origin_revision):
                     sys.exit("change {0} not based on {1} for {2}, cannot unshelve".format(
                         commit["change"], self.initialParent, path))
@@ -2610,7 +2615,7 @@ class P4Sync(Command, P4UserMap):
     def streamOneP4File(self, file, contents):
         relPath = self.stripRepoPath(file['depotFile'], self.branchPrefixes)
         relPath = self.encodeWithUTF8(relPath)
-        if verbose:
+        if verbose and 'fileSize' in self.stream_file:
             size = int(self.stream_file['fileSize'])
             sys.stdout.write('\r%s --> %s (%i MB)\n' % (file['depotFile'], relPath, size/1024/1024))
             sys.stdout.flush()
